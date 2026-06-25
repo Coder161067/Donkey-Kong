@@ -1,0 +1,699 @@
+------- FILE dk2600.asm LEVEL 1 PASS 2
+      1  10000 ????						; Donkey Kong for Atari 2600
+      2  10000 ????						; Assembled with DASM - NTSC 4K ROM
+      3  10000 ????				       processor	6502
+      4  10000 ????
+      5  10000 ????						; TIA write registers
+      6  10000 ????		00 00	    VSYNC      equ	$00
+      7  10000 ????		00 01	    VBLANK     equ	$01
+      8  10000 ????		00 02	    WSYNC      equ	$02
+      9  10000 ????		00 04	    NUSIZ0     equ	$04
+     10  10000 ????		00 05	    NUSIZ1     equ	$05
+     11  10000 ????		00 06	    COLUP0     equ	$06
+     12  10000 ????		00 07	    COLUP1     equ	$07
+     13  10000 ????		00 08	    COLUPF     equ	$08
+     14  10000 ????		00 09	    COLUBK     equ	$09
+     15  10000 ????		00 0a	    CTRLPF     equ	$0A
+     16  10000 ????		00 0b	    REFP0      equ	$0B
+     17  10000 ????		00 0c	    REFP1      equ	$0C
+     18  10000 ????		00 0d	    PF0        equ	$0D
+     19  10000 ????		00 0e	    PF1        equ	$0E
+     20  10000 ????		00 0f	    PF2        equ	$0F
+     21  10000 ????		00 10	    RESP0      equ	$10
+     22  10000 ????		00 11	    RESP1      equ	$11
+     23  10000 ????		00 12	    RESM0      equ	$12
+     24  10000 ????		00 13	    RESM1      equ	$13
+     25  10000 ????		00 15	    AUDC0      equ	$15
+     26  10000 ????		00 16	    AUDC1      equ	$16
+     27  10000 ????		00 17	    AUDF0      equ	$17
+     28  10000 ????		00 18	    AUDF1      equ	$18
+     29  10000 ????		00 19	    AUDV0      equ	$19
+     30  10000 ????		00 1a	    AUDV1      equ	$1A
+     31  10000 ????		00 20	    HMP0       equ	$20
+     32  10000 ????		00 21	    HMP1       equ	$21
+     33  10000 ????		00 22	    HMM0       equ	$22
+     34  10000 ????		00 23	    HMM1       equ	$23
+     35  10000 ????		00 2b	    HMOVE      equ	$2B
+     36  10000 ????		00 2d	    GRP0       equ	$2D
+     37  10000 ????		00 2e	    GRP1       equ	$2E
+     38  10000 ????		00 2f	    ENAM0      equ	$2F
+     39  10000 ????		00 30	    ENAM1      equ	$30
+     40  10000 ????		00 29	    RESMP0     equ	$29
+     41  10000 ????		00 2a	    RESMP1     equ	$2A
+     42  10000 ????
+     43  10000 ????						; TIA collision read registers
+     44  10000 ????		00 00	    CXM0P      equ	$00
+     45  10000 ????		00 01	    CXM1P      equ	$01
+     46  10000 ????		00 07	    CXPPMM     equ	$07
+     47  10000 ????		00 0c	    INPT4      equ	$0C
+     48  10000 ????		02 80	    SWCHA      equ	$280
+     49  10000 ????		02 84	    INTIM      equ	$284
+     50  10000 ????		02 96	    TIM64T     equ	$296
+     51  10000 ????
+     52  10000 ????						; ===== Zero Page RAM ($80-$FF) =====
+     53 U009d ????				      seg.u	vars
+     54 U0080					      org	$80
+     55 U0080
+     56 U0080		       00	   FCnt       ds	1
+     57 U0081		       00	   Rnd	      ds	1
+     58 U0082		       00	   GStat      ds	1
+     59 U0083		       00	   JM_X       ds	1
+     60 U0084		       00	   JM_Y       ds	1
+     61 U0085		       00	   JM_D       ds	1
+     62 U0086		       00	   JM_J       ds	1
+     63 U0087		       00	   JM_V       ds	1
+     64 U0088		       00	   JM_G       ds	1
+     65 U0089		       00	   JM_H       ds	1
+     66 U008a		       00	   B1_X       ds	1
+     67 U008b		       00	   B1_Y       ds	1
+     68 U008c		       00	   B1_A       ds	1
+     69 U008d		       00	   B1_D       ds	1
+     70 U008e		       00	   B2_X       ds	1
+     71 U008f		       00	   B2_Y       ds	1
+     72 U0090		       00	   B2_A       ds	1
+     73 U0091		       00	   B2_D       ds	1
+     74 U0092		       00	   Lives      ds	1
+     75 U0093		       00	   DK_T       ds	1
+     76 U0094		       00	   SLoc       ds	1
+     77 U0095		       00	   Tmp	      ds	1
+     78 U0096		       00	   Tmp2       ds	1
+     79 U0097		       00	   HmpV       ds	1
+     80 U0098		       00	   P0Row      ds	1
+     81 U0099		       00	   P1Row      ds	1
+     82 U009a		       00	   B1On       ds	1
+     83 U009b		       00	   B2On       ds	1
+     84 U009c		       00	   PFCol      ds	1
+     85 U009d
+     86 U009d							; ===== Code =====
+     87  10000 ????				       seg	code
+     88  f000					      org	$F000
+     89  f000
+     90  f000				   Start
+     91  f000		       78		      sei
+     92  f001		       d8		      cld
+     93  f002		       a2 00		      ldx	#0
+     94  f004		       8a		      txa
+     95  f005		       a8		      tay
+     96  f006				   Clear
+     97  f006		       95 00		      sta	0,x
+     98  f008		       e8		      inx
+     99  f009		       d0 fb		      bne	Clear
+    100  f00b		       a2 ff		      ldx	#$FF
+    101  f00d		       9a		      txs
+    102  f00e		       a9 03		      lda	#3
+    103  f010		       85 92		      sta	Lives
+    104  f012		       a9 4c		      lda	#76
+    105  f014		       85 83		      sta	JM_X
+    106  f016		       a9 96		      lda	#150
+    107  f018		       85 84		      sta	JM_Y
+    108  f01a		       a9 a0		      lda	#160
+    109  f01c		       85 88		      sta	JM_G
+    110  f01e
+    111  f01e							; ===== FRAME LOOP =====
+    112  f01e				   Main
+    113  f01e		       a9 02		      lda	#2
+    114  f020		       85 00		      sta	VSYNC
+    115  f022		       85 02		      sta	WSYNC
+    116  f024		       85 02		      sta	WSYNC
+    117  f026		       85 02		      sta	WSYNC
+    118  f028		       a9 00		      lda	#0
+    119  f02a		       85 00		      sta	VSYNC
+    120  f02c		       a9 42		      lda	#%01000010
+    121  f02e		       85 01		      sta	VBLANK
+    122  f030		       20 5e f0 	      jsr	DoLogic
+    123  f033		       20 52 f2 	      jsr	PosSpr
+    124  f036		       a9 2b		      lda	#43
+    125  f038		       8d 96 02 	      sta	TIM64T
+    126  f03b				   VWait
+    127  f03b		       ad 84 02 	      lda	INTIM
+    128  f03e		       d0 fb		      bne	VWait
+    129  f040		       a9 00		      lda	#0
+    130  f042		       85 01		      sta	VBLANK
+    131  f044		       20 b6 f2 	      jsr	DoKernel
+    132  f047		       a9 42		      lda	#%01000010
+    133  f049		       85 01		      sta	VBLANK
+    134  f04b		       a9 23		      lda	#35
+    135  f04d		       8d 96 02 	      sta	TIM64T
+    136  f050				   OWait
+    137  f050		       ad 84 02 	      lda	INTIM
+    138  f053		       d0 fb		      bne	OWait
+    139  f055		       a9 00		      lda	#0
+    140  f057		       85 01		      sta	VBLANK
+    141  f059		       e6 80		      inc	FCnt
+    142  f05b		       4c 1e f0 	      jmp	Main
+    143  f05e
+    144  f05e							; ===== GAME LOGIC =====
+    145  f05e				   DoLogic
+    146  f05e		       a5 82		      lda	GStat
+    147  f060		       c9 00		      cmp	#0
+    148  f062		       f0 09		      beq	DoTitle
+    149  f064		       c9 01		      cmp	#1
+    150  f066		       f0 59		      beq	DoPlay
+    151  f068		       c9 02		      cmp	#2
+    152  f06a		       f0 2e		      beq	DoDying
+    153  f06c		       60		      rts
+    154  f06d
+    155  f06d				   DoTitle
+    156  f06d		       a5 0c		      lda	INPT4
+    157  f06f		       30 28		      bmi	TitleWait
+    158  f071		       a5 80		      lda	FCnt
+    159  f073		       29 0f		      and	#$0F
+    160  f075		       d0 22		      bne	TitleWait
+    161  f077		       a9 01		      lda	#1
+    162  f079		       85 82		      sta	GStat
+    163  f07b		       a9 4c		      lda	#76
+    164  f07d		       85 83		      sta	JM_X
+    165  f07f		       a9 96		      lda	#150
+    166  f081		       85 84		      sta	JM_Y
+    167  f083		       a9 a0		      lda	#160
+    168  f085		       85 88		      sta	JM_G
+    169  f087		       a9 00		      lda	#0
+    170  f089		       85 86		      sta	JM_J
+    171  f08b		       85 87		      sta	JM_V
+    172  f08d		       85 8c		      sta	B1_A
+    173  f08f		       85 90		      sta	B2_A
+    174  f091		       a9 03		      lda	#3
+    175  f093		       85 92		      sta	Lives
+    176  f095		       a9 3c		      lda	#60
+    177  f097		       85 93		      sta	DK_T
+    178  f099				   TitleWait
+    179  f099		       60		      rts
+    180  f09a
+    181  f09a				   DoDying
+    182  f09a		       a5 89		      lda	JM_H
+    183  f09c		       f0 03		      beq	DyingCont
+    184  f09e		       c6 89		      dec	JM_H
+    185  f0a0		       60		      rts
+    186  f0a1				   DyingCont
+    187  f0a1		       c6 92		      dec	Lives
+    188  f0a3		       10 05		      bpl	DyingRespawn
+    189  f0a5		       a9 00		      lda	#0
+    190  f0a7		       85 82		      sta	GStat
+    191  f0a9		       60		      rts
+    192  f0aa				   DyingRespawn
+    193  f0aa		       a9 01		      lda	#1
+    194  f0ac		       85 82		      sta	GStat
+    195  f0ae		       a9 4c		      lda	#76
+    196  f0b0		       85 83		      sta	JM_X
+    197  f0b2		       a9 96		      lda	#150
+    198  f0b4		       85 84		      sta	JM_Y
+    199  f0b6		       a9 a0		      lda	#160
+    200  f0b8		       85 88		      sta	JM_G
+    201  f0ba		       a9 00		      lda	#0
+    202  f0bc		       85 86		      sta	JM_J
+    203  f0be		       85 87		      sta	JM_V
+    204  f0c0		       60		      rts
+    205  f0c1
+    206  f0c1				   DoPlay
+    207  f0c1							; Left joystick (SWCHA bit 1, active low)
+    208  f0c1		       ad 80 02 	      lda	SWCHA
+    209  f0c4		       29 02		      and	#%00000010
+    210  f0c6		       d0 10		      bne	DoPlayRight
+    211  f0c8		       a5 83		      lda	JM_X
+    212  f0ca		       38		      sec
+    213  f0cb		       e9 02		      sbc	#2
+    214  f0cd		       30 1f		      bmi	DoPlayJump
+    215  f0cf		       85 83		      sta	JM_X
+    216  f0d1		       a9 01		      lda	#1
+    217  f0d3		       85 85		      sta	JM_D
+    218  f0d5		       4c ee f0 	      jmp	DoPlayJump
+    219  f0d8				   DoPlayRight
+    220  f0d8		       ad 80 02 	      lda	SWCHA
+    221  f0db		       29 01		      and	#%00000001
+    222  f0dd		       d0 0f		      bne	DoPlayJump
+    223  f0df		       a5 83		      lda	JM_X
+    224  f0e1		       18		      clc
+    225  f0e2		       69 02		      adc	#2
+    226  f0e4		       c9 96		      cmp	#150
+    227  f0e6		       b0 06		      bcs	DoPlayJump
+    228  f0e8		       85 83		      sta	JM_X
+    229  f0ea		       a9 00		      lda	#0
+    230  f0ec		       85 85		      sta	JM_D
+    231  f0ee
+    232  f0ee				   DoPlayJump
+    233  f0ee		       a5 0c		      lda	INPT4
+    234  f0f0		       30 18		      bmi	DoPlayNoJump
+    235  f0f2		       a5 86		      lda	JM_J
+    236  f0f4		       d0 14		      bne	DoPlayNoJump
+    237  f0f6		       a9 01		      lda	#1
+    238  f0f8		       85 86		      sta	JM_J
+    239  f0fa		       a9 f0		      lda	#$F0
+    240  f0fc		       85 87		      sta	JM_V
+    241  f0fe		       a9 0c		      lda	#12
+    242  f100		       85 15		      sta	AUDC0
+    243  f102		       a9 08		      lda	#8
+    244  f104		       85 17		      sta	AUDF0
+    245  f106		       a9 08		      lda	#8
+    246  f108		       85 19		      sta	AUDV0
+    247  f10a
+    248  f10a				   DoPlayNoJump
+    249  f10a		       a5 86		      lda	JM_J
+    250  f10c		       f0 23		      beq	DoPlayGround
+    251  f10e		       a5 87		      lda	JM_V
+    252  f110		       18		      clc
+    253  f111		       69 04		      adc	#4
+    254  f113		       85 87		      sta	JM_V
+    255  f115		       a5 84		      lda	JM_Y
+    256  f117		       18		      clc
+    257  f118		       65 87		      adc	JM_V
+    258  f11a		       85 84		      sta	JM_Y
+    259  f11c		       a5 84		      lda	JM_Y
+    260  f11e		       c5 88		      cmp	JM_G
+    261  f120		       90 27		      bcc	DoPlayDK
+    262  f122		       a5 88		      lda	JM_G
+    263  f124		       85 84		      sta	JM_Y
+    264  f126		       a9 00		      lda	#0
+    265  f128		       85 86		      sta	JM_J
+    266  f12a		       85 87		      sta	JM_V
+    267  f12c		       85 19		      sta	AUDV0
+    268  f12e		       4c 49 f1 	      jmp	DoPlayDK
+    269  f131
+    270  f131				   DoPlayGround
+    271  f131		       a5 84		      lda	JM_Y
+    272  f133		       c9 a0		      cmp	#160
+    273  f135		       90 0b		      bcc	DoPlaySetGround
+    274  f137		       a9 a0		      lda	#160
+    275  f139		       85 88		      sta	JM_G
+    276  f13b		       a5 88		      lda	JM_G
+    277  f13d		       85 84		      sta	JM_Y
+    278  f13f		       4c 49 f1 	      jmp	DoPlayDK
+    279  f142				   DoPlaySetGround
+    280  f142		       a5 84		      lda	JM_Y
+    281  f144		       38		      sec
+    282  f145		       e9 10		      sbc	#$10
+    283  f147		       85 88		      sta	JM_G
+    284  f149
+    285  f149				   DoPlayDK
+    286  f149		       c6 93		      dec	DK_T
+    287  f14b		       d0 36		      bne	DoPlayBarrel
+    288  f14d		       a9 28		      lda	#40
+    289  f14f		       85 93		      sta	DK_T
+    290  f151		       a5 8c		      lda	B1_A
+    291  f153		       f0 07		      beq	DoPlaySpawn1
+    292  f155		       a5 90		      lda	B2_A
+    293  f157		       f0 18		      beq	DoPlaySpawn2
+    294  f159		       4c 83 f1 	      jmp	DoPlayBarrel
+    295  f15c				   DoPlaySpawn1
+    296  f15c		       a9 01		      lda	#1
+    297  f15e		       85 8c		      sta	B1_A
+    298  f160		       a9 32		      lda	#50
+    299  f162		       85 8a		      sta	B1_X
+    300  f164		       a9 1e		      lda	#30
+    301  f166		       85 8b		      sta	B1_Y
+    302  f168		       a5 80		      lda	FCnt
+    303  f16a		       29 01		      and	#$01
+    304  f16c		       85 8d		      sta	B1_D
+    305  f16e		       4c 83 f1 	      jmp	DoPlayBarrel
+    306  f171				   DoPlaySpawn2
+    307  f171		       a9 01		      lda	#1
+    308  f173		       85 90		      sta	B2_A
+    309  f175		       a9 32		      lda	#50
+    310  f177		       85 8e		      sta	B2_X
+    311  f179		       a9 1e		      lda	#30
+    312  f17b		       85 8f		      sta	B2_Y
+    313  f17d		       a5 80		      lda	FCnt
+    314  f17f		       29 01		      and	#$01
+    315  f181		       85 91		      sta	B2_D
+    316  f183
+    317  f183				   DoPlayBarrel
+    318  f183		       a5 8c		      lda	B1_A
+    319  f185		       f0 22		      beq	DoPlayB2
+    320  f187		       a5 8b		      lda	B1_Y
+    321  f189		       18		      clc
+    322  f18a		       69 01		      adc	#1
+    323  f18c		       85 8b		      sta	B1_Y
+    324  f18e		       a5 80		      lda	FCnt
+    325  f190		       29 01		      and	#$01
+    326  f192		       d0 15		      bne	DoPlayB2
+    327  f194		       a5 8d		      lda	B1_D
+    328  f196		       f0 0a		      beq	DoPlayB1R
+    329  f198		       a5 8a		      lda	B1_X
+    330  f19a		       38		      sec
+    331  f19b		       e9 01		      sbc	#1
+    332  f19d		       85 8a		      sta	B1_X
+    333  f19f		       4c a9 f1 	      jmp	DoPlayB2
+    334  f1a2				   DoPlayB1R
+    335  f1a2		       a5 8a		      lda	B1_X
+    336  f1a4		       18		      clc
+    337  f1a5		       69 01		      adc	#1
+    338  f1a7		       85 8a		      sta	B1_X
+    339  f1a9				   DoPlayB2
+    340  f1a9		       a5 90		      lda	B2_A
+    341  f1ab		       f0 22		      beq	DoPlayBChk
+    342  f1ad		       a5 8f		      lda	B2_Y
+    343  f1af		       18		      clc
+    344  f1b0		       69 01		      adc	#1
+    345  f1b2		       85 8f		      sta	B2_Y
+    346  f1b4		       a5 80		      lda	FCnt
+    347  f1b6		       29 01		      and	#$01
+    348  f1b8		       d0 15		      bne	DoPlayBChk
+    349  f1ba		       a5 91		      lda	B2_D
+    350  f1bc		       f0 0a		      beq	DoPlayB2R
+    351  f1be		       a5 8e		      lda	B2_X
+    352  f1c0		       38		      sec
+    353  f1c1		       e9 01		      sbc	#1
+    354  f1c3		       85 8e		      sta	B2_X
+    355  f1c5		       4c cf f1 	      jmp	DoPlayBChk
+    356  f1c8				   DoPlayB2R
+    357  f1c8		       a5 8e		      lda	B2_X
+    358  f1ca		       18		      clc
+    359  f1cb		       69 01		      adc	#1
+    360  f1cd		       85 8e		      sta	B2_X
+    361  f1cf
+    362  f1cf				   DoPlayBChk
+    363  f1cf		       a5 8b		      lda	B1_Y
+    364  f1d1		       c9 c0		      cmp	#192
+    365  f1d3		       90 04		      bcc	DoPlayBChk2
+    366  f1d5		       a9 00		      lda	#0
+    367  f1d7		       85 8c		      sta	B1_A
+    368  f1d9				   DoPlayBChk2
+    369  f1d9		       a5 8f		      lda	B2_Y
+    370  f1db		       c9 c0		      cmp	#192
+    371  f1dd		       90 04		      bcc	DoPlayCollide
+    372  f1df		       a9 00		      lda	#0
+    373  f1e1		       85 90		      sta	B2_A
+    374  f1e3
+    375  f1e3				   DoPlayCollide
+    376  f1e3		       a5 8c		      lda	B1_A
+    377  f1e5		       f0 23		      beq	DoPlayCollide2
+    378  f1e7		       a5 83		      lda	JM_X
+    379  f1e9		       38		      sec
+    380  f1ea		       e5 8a		      sbc	B1_X
+    381  f1ec		       10 05		      bpl	Col1Pos
+    382  f1ee		       49 ff		      eor	#$FF
+    383  f1f0		       18		      clc
+    384  f1f1		       69 01		      adc	#1
+    385  f1f3				   Col1Pos
+    386  f1f3		       c9 0a		      cmp	#10
+    387  f1f5		       b0 13		      bcs	DoPlayCollide2
+    388  f1f7		       a5 84		      lda	JM_Y
+    389  f1f9		       38		      sec
+    390  f1fa		       e5 8b		      sbc	B1_Y
+    391  f1fc		       10 05		      bpl	Col1PosY
+    392  f1fe		       49 ff		      eor	#$FF
+    393  f200		       18		      clc
+    394  f201		       69 01		      adc	#1
+    395  f203				   Col1PosY
+    396  f203		       c9 0c		      cmp	#12
+    397  f205		       b0 03		      bcs	DoPlayCollide2
+    398  f207		       4c 2e f2 	      jmp	KillJumpman
+    399  f20a
+    400  f20a				   DoPlayCollide2
+    401  f20a		       a5 90		      lda	B2_A
+    402  f20c		       f0 35		      beq	DoPlayFall
+    403  f20e		       a5 83		      lda	JM_X
+    404  f210		       38		      sec
+    405  f211		       e5 8e		      sbc	B2_X
+    406  f213		       10 05		      bpl	Col2Pos
+    407  f215		       49 ff		      eor	#$FF
+    408  f217		       18		      clc
+    409  f218		       69 01		      adc	#1
+    410  f21a				   Col2Pos
+    411  f21a		       c9 0a		      cmp	#10
+    412  f21c		       b0 25		      bcs	DoPlayFall
+    413  f21e		       a5 84		      lda	JM_Y
+    414  f220		       38		      sec
+    415  f221		       e5 8f		      sbc	B2_Y
+    416  f223		       10 05		      bpl	Col2PosY
+    417  f225		       49 ff		      eor	#$FF
+    418  f227		       18		      clc
+    419  f228		       69 01		      adc	#1
+    420  f22a				   Col2PosY
+    421  f22a		       c9 0c		      cmp	#12
+    422  f22c		       b0 15		      bcs	DoPlayFall
+    423  f22e
+    424  f22e				   KillJumpman
+    425  f22e		       a9 02		      lda	#2
+    426  f230		       85 82		      sta	GStat
+    427  f232		       a9 32		      lda	#50
+    428  f234		       85 89		      sta	JM_H
+    429  f236		       a9 04		      lda	#4
+    430  f238		       85 16		      sta	AUDC1
+    431  f23a		       a9 03		      lda	#3
+    432  f23c		       85 18		      sta	AUDF1
+    433  f23e		       a9 0a		      lda	#10
+    434  f240		       85 1a		      sta	AUDV1
+    435  f242		       60		      rts
+    436  f243
+    437  f243				   DoPlayFall
+    438  f243		       a5 84		      lda	JM_Y
+    439  f245		       c9 be		      cmp	#190
+    440  f247		       90 08		      bcc	DoPlayDone
+    441  f249		       a9 02		      lda	#2
+    442  f24b		       85 82		      sta	GStat
+    443  f24d		       a9 28		      lda	#40
+    444  f24f		       85 89		      sta	JM_H
+    445  f251				   DoPlayDone
+    446  f251		       60		      rts
+    447  f252
+    448  f252							; ===== SPRITE POSITIONING =====
+    449  f252				   PosSpr
+    450  f252		       a5 83		      lda	JM_X
+    451  f254		       a2 00		      ldx	#0
+    452  f256		       20 7b f2 	      jsr	PosOne
+    453  f259		       a9 28		      lda	#40
+    454  f25b		       a2 01		      ldx	#1
+    455  f25d		       20 7b f2 	      jsr	PosOne
+    456  f260		       a5 8c		      lda	B1_A
+    457  f262		       f0 07		      beq	PosSpr2
+    458  f264		       a5 8a		      lda	B1_X
+    459  f266		       a2 02		      ldx	#2
+    460  f268		       20 7b f2 	      jsr	PosOne
+    461  f26b				   PosSpr2
+    462  f26b		       a5 90		      lda	B2_A
+    463  f26d		       f0 07		      beq	PosSprEnd
+    464  f26f		       a5 8e		      lda	B2_X
+    465  f271		       a2 03		      ldx	#3
+    466  f273		       20 7b f2 	      jsr	PosOne
+    467  f276				   PosSprEnd
+    468  f276		       85 02		      sta	WSYNC
+    469  f278		       85 2b		      sta	HMOVE
+    470  f27a		       60		      rts
+    471  f27b
+    472  f27b							; Position one sprite/missile
+    473  f27b							; A=X position, X=0(P0) 1(P1) 2(M0) 3(M1)
+    474  f27b				   PosOne
+    475  f27b		       38		      sec
+    476  f27c		       85 95		      sta	Tmp
+    477  f27e		       a0 0f		      ldy	#15
+    478  f280				   PosDiv
+    479  f280		       e9 0f		      sbc	#15
+    480  f282		       b0 fc		      bcs	PosDiv
+    481  f284		       49 ff		      eor	#$FF
+    482  f286		       69 01		      adc	#1
+    483  f288		       0a		      asl
+    484  f289		       0a		      asl
+    485  f28a		       0a		      asl
+    486  f28b		       0a		      asl
+    487  f28c		       85 97		      sta	HmpV
+    488  f28e		       e0 00		      cpx	#0
+    489  f290		       f0 1d		      beq	PosResp0
+    490  f292		       e0 01		      cpx	#1
+    491  f294		       f0 12		      beq	PosResp1
+    492  f296		       e0 02		      cpx	#2
+    493  f298		       f0 07		      beq	PosResm0
+    494  f29a		       85 13		      sta	RESM1
+    495  f29c		       a5 97		      lda	HmpV
+    496  f29e		       85 23		      sta	HMM1
+    497  f2a0		       60		      rts
+    498  f2a1				   PosResm0
+    499  f2a1		       85 12		      sta	RESM0
+    500  f2a3		       a5 97		      lda	HmpV
+    501  f2a5		       85 22		      sta	HMM0
+    502  f2a7		       60		      rts
+    503  f2a8				   PosResp1
+    504  f2a8		       85 11		      sta	RESP1
+    505  f2aa		       a5 97		      lda	HmpV
+    506  f2ac		       85 21		      sta	HMP1
+    507  f2ae		       60		      rts
+    508  f2af				   PosResp0
+    509  f2af		       85 10		      sta	RESP0
+    510  f2b1		       a5 97		      lda	HmpV
+    511  f2b3		       85 20		      sta	HMP0
+    512  f2b5		       60		      rts
+    513  f2b6
+    514  f2b6							; ===== DISPLAY KERNEL =====
+    515  f2b6				   DoKernel
+    516  f2b6		       a9 00		      lda	#$00
+    517  f2b8		       85 09		      sta	COLUBK
+    518  f2ba		       a9 1c		      lda	#$1C
+    519  f2bc		       85 06		      sta	COLUP0
+    520  f2be		       a9 c6		      lda	#$C6
+    521  f2c0		       85 07		      sta	COLUP1
+    522  f2c2		       a9 01		      lda	#%00000001
+    523  f2c4		       85 0a		      sta	CTRLPF
+    524  f2c6		       a9 20		      lda	#%00100000
+    525  f2c8		       85 04		      sta	NUSIZ0
+    526  f2ca		       85 05		      sta	NUSIZ1
+    527  f2cc		       a9 00		      lda	#0
+    528  f2ce		       85 29		      sta	RESMP0
+    529  f2d0		       85 2a		      sta	RESMP1
+    530  f2d2		       a9 00		      lda	#0
+    531  f2d4		       85 2d		      sta	GRP0
+    532  f2d6		       85 2e		      sta	GRP1
+    533  f2d8		       85 2f		      sta	ENAM0
+    534  f2da		       85 30		      sta	ENAM1
+    535  f2dc		       85 94		      sta	SLoc
+    536  f2de		       85 98		      sta	P0Row
+    537  f2e0		       85 99		      sta	P1Row
+    538  f2e2		       85 9a		      sta	B1On
+    539  f2e4		       85 9b		      sta	B2On
+    540  f2e6		       85 9c		      sta	PFCol
+    541  f2e8
+    542  f2e8		       a2 c0		      ldx	#192
+    543  f2ea				   KernLoop
+    544  f2ea		       a5 98		      lda	P0Row
+    545  f2ec		       85 2d		      sta	GRP0
+    546  f2ee		       a5 99		      lda	P1Row
+    547  f2f0		       85 2e		      sta	GRP1
+    548  f2f2		       a5 9a		      lda	B1On
+    549  f2f4		       85 2f		      sta	ENAM0
+    550  f2f6		       a5 9b		      lda	B2On
+    551  f2f8		       85 30		      sta	ENAM1
+    552  f2fa		       a5 9c		      lda	PFCol
+    553  f2fc		       85 08		      sta	COLUPF
+    554  f2fe		       c9 c4		      cmp	#$C4
+    555  f300		       f0 0b		      beq	KernGirder
+    556  f302		       a9 00		      lda	#0
+    557  f304		       85 0d		      sta	PF0
+    558  f306		       85 0e		      sta	PF1
+    559  f308		       85 0f		      sta	PF2
+    560  f30a		       4c 15 f3 	      jmp	KernPFok
+    561  f30d				   KernGirder
+    562  f30d		       a9 ff		      lda	#$FF
+    563  f30f		       85 0d		      sta	PF0
+    564  f311		       85 0e		      sta	PF1
+    565  f313		       85 0f		      sta	PF2
+    566  f315				   KernPFok
+    567  f315
+    568  f315		       e6 94		      inc	SLoc
+    569  f317		       a5 94		      lda	SLoc
+    570  f319
+    571  f319		       c9 08		      cmp	#8
+    572  f31b		       90 36		      bcc	KernGirder2
+    573  f31d		       c9 10		      cmp	#16
+    574  f31f		       b0 03		      bcs	KernP1
+    575  f321		       4c 5a f3 	      jmp	KernOpen
+    576  f324				   KernP1
+    577  f324		       c9 16		      cmp	#22
+    578  f326		       90 2b		      bcc	KernGirder2
+    579  f328		       c9 26		      cmp	#38
+    580  f32a		       90 2e		      bcc	KernOpen
+    581  f32c		       c9 2c		      cmp	#44
+    582  f32e		       90 23		      bcc	KernGirder2
+    583  f330		       c9 3c		      cmp	#60
+    584  f332		       90 26		      bcc	KernOpen
+    585  f334		       c9 42		      cmp	#66
+    586  f336		       90 1b		      bcc	KernGirder2
+    587  f338		       c9 52		      cmp	#82
+    588  f33a		       90 1e		      bcc	KernOpen
+    589  f33c		       c9 58		      cmp	#88
+    590  f33e		       90 13		      bcc	KernGirder2
+    591  f340		       c9 68		      cmp	#104
+    592  f342		       90 16		      bcc	KernOpen
+    593  f344		       c9 6e		      cmp	#110
+    594  f346		       90 0b		      bcc	KernGirder2
+    595  f348		       c9 7e		      cmp	#126
+    596  f34a		       90 0e		      bcc	KernOpen
+    597  f34c		       c9 84		      cmp	#132
+    598  f34e		       90 03		      bcc	KernGirder2
+    599  f350		       4c 5a f3 	      jmp	KernOpen
+    600  f353
+    601  f353				   KernGirder2
+    602  f353		       a9 c4		      lda	#$C4
+    603  f355		       85 9c		      sta	PFCol
+    604  f357		       4c 5e f3 	      jmp	KernP0
+    605  f35a				   KernOpen
+    606  f35a		       a9 00		      lda	#$00
+    607  f35c		       85 9c		      sta	PFCol
+    608  f35e
+    609  f35e				   KernP0
+    610  f35e		       a5 94		      lda	SLoc
+    611  f360		       38		      sec
+    612  f361		       e5 84		      sbc	JM_Y
+    613  f363		       30 0d		      bmi	KernP0off
+    614  f365		       c9 08		      cmp	#8
+    615  f367		       b0 09		      bcs	KernP0off
+    616  f369		       a8		      tay
+    617  f36a		       b9 d7 f3 	      lda	JMSpr,y
+    618  f36d		       85 98		      sta	P0Row
+    619  f36f		       4c 76 f3 	      jmp	KernP1draw
+    620  f372				   KernP0off
+    621  f372		       a9 00		      lda	#0
+    622  f374		       85 98		      sta	P0Row
+    623  f376
+    624  f376				   KernP1draw
+    625  f376		       a5 94		      lda	SLoc
+    626  f378		       38		      sec
+    627  f379		       e9 06		      sbc	#6
+    628  f37b		       30 0d		      bmi	KernP1off
+    629  f37d		       c9 0a		      cmp	#10
+    630  f37f		       b0 09		      bcs	KernP1off
+    631  f381		       a8		      tay
+    632  f382		       b9 df f3 	      lda	DKSpr,y
+    633  f385		       85 99		      sta	P1Row
+    634  f387		       4c 8e f3 	      jmp	KernB1
+    635  f38a				   KernP1off
+    636  f38a		       a9 00		      lda	#0
+    637  f38c		       85 99		      sta	P1Row
+    638  f38e
+    639  f38e				   KernB1
+    640  f38e		       a5 8c		      lda	B1_A
+    641  f390		       f0 17		      beq	KernB1off
+    642  f392		       a5 8b		      lda	B1_Y
+    643  f394		       38		      sec
+    644  f395		       e5 94		      sbc	SLoc
+    645  f397		       10 05		      bpl	KernB1chk
+    646  f399		       49 ff		      eor	#$FF
+    647  f39b		       18		      clc
+    648  f39c		       69 01		      adc	#1
+    649  f39e				   KernB1chk
+    650  f39e		       c9 03		      cmp	#3
+    651  f3a0		       b0 07		      bcs	KernB1off
+    652  f3a2		       a9 02		      lda	#%00000010
+    653  f3a4		       85 9a		      sta	B1On
+    654  f3a6		       4c ad f3 	      jmp	KernB2
+    655  f3a9				   KernB1off
+    656  f3a9		       a9 00		      lda	#0
+    657  f3ab		       85 9a		      sta	B1On
+    658  f3ad
+    659  f3ad				   KernB2
+    660  f3ad		       a5 90		      lda	B2_A
+    661  f3af		       f0 17		      beq	KernB2off
+    662  f3b1		       a5 8f		      lda	B2_Y
+    663  f3b3		       38		      sec
+    664  f3b4		       e5 94		      sbc	SLoc
+    665  f3b6		       10 05		      bpl	KernB2chk
+    666  f3b8		       49 ff		      eor	#$FF
+    667  f3ba		       18		      clc
+    668  f3bb		       69 01		      adc	#1
+    669  f3bd				   KernB2chk
+    670  f3bd		       c9 03		      cmp	#3
+    671  f3bf		       b0 07		      bcs	KernB2off
+    672  f3c1		       a9 02		      lda	#%00000010
+    673  f3c3		       85 9b		      sta	B2On
+    674  f3c5		       4c cc f3 	      jmp	KernWait
+    675  f3c8				   KernB2off
+    676  f3c8		       a9 00		      lda	#0
+    677  f3ca		       85 9b		      sta	B2On
+    678  f3cc
+    679  f3cc				   KernWait
+    680  f3cc		       ca		      dex
+    681  f3cd		       f0 05		      beq	KernDone
+    682  f3cf		       85 02		      sta	WSYNC
+    683  f3d1		       4c ea f2 	      jmp	KernLoop
+    684  f3d4
+    685  f3d4				   KernDone
+    686  f3d4		       85 02		      sta	WSYNC
+    687  f3d6		       60		      rts
+    688  f3d7
+    689  f3d7							; ===== SPRITE BITMAPS =====
+    690  f3d7				   JMSpr
+    691  f3d7		       3c 7e db ff*	      .byte.b	$3C, $7E, $DB, $FF, $7E, $7E, $3C, $24
+    692  f3df				   DKSpr
+    693  f3df		       00 3c 7e ff*	      .byte.b	$00, $3C, $7E, $FF, $FF, $7E, $5A, $66, $66, $7E
+    694  f3e9
+    695  f3e9							; ===== RESET VECTORS =====
+    696  fffc					      org	$FFFC
+    697  fffc		       00 f0		      .word.w	Start
+    698  fffe		       00 f0		      .word.w	Start
